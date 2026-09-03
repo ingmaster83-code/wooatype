@@ -28,7 +28,8 @@ layout: default
   </div>
 
   <!-- 플레이 화면 -->
-  <div id="playScreen" style="display:none;">
+  <div id="playScreen" style="display:none;position:relative;">
+    <button class="sound-toggle" id="soundToggle" title="소리 켜기/끄기">🔊</button>
     <div class="stat-row">
       <div class="stat-box"><div class="label">진행</div><div class="value" id="statProgress">0/0</div></div>
       <div class="stat-box"><div class="label">타수</div><div class="value" id="statCpm">0</div></div>
@@ -37,7 +38,10 @@ layout: default
     </div>
     <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
 
-    <div class="word-display" id="wordDisplay"></div>
+    <div style="position:relative;">
+      <div class="word-display" id="wordDisplay"></div>
+      <span class="combo-badge" id="comboBadge"></span>
+    </div>
     <input type="text" id="typeInput" class="type-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="여기에 입력하세요">
     <p class="next-word-hint">글자를 다 입력하면 자동으로 다음 단어로 넘어갑니다</p>
 
@@ -81,6 +85,8 @@ layout: default
 </div>
 
 <script src="{{ '/assets/js/typing-engine.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/typing-sound.js' | relative_url }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="{{ '/assets/js/leaderboard.js' | relative_url }}"></script>
@@ -107,6 +113,8 @@ layout: default
   var selectedCount = 50;
   var game = null;
   var liveTimer = null;
+  var combo = 0;
+  var lastCpm = 0;
 
   countSelect.addEventListener('click', function (e) {
     var btn = e.target.closest('.count-btn');
@@ -122,10 +130,22 @@ layout: default
     startScreen.style.display = 'block';
   });
 
+  // 사운드 토글
+  var soundToggle = document.getElementById('soundToggle');
+  function refreshSoundIcon() { soundToggle.textContent = WootypeSound.isMuted() ? '🔇' : '🔊'; }
+  refreshSoundIcon();
+  soundToggle.addEventListener('click', function () {
+    WootypeSound.setMuted(!WootypeSound.isMuted());
+    refreshSoundIcon();
+  });
+
   function startGame() {
+    WootypeSound.playKeystroke(); // 사용자 클릭(제스처) 안에서 AudioContext를 확실히 깨워둠
     var words = WootypeEngine.pickWords(WORD_POOL, selectedCount);
     game = new WootypeEngine.TypingGame(words);
     game.start();
+    combo = 0;
+    lastCpm = 0;
 
     startScreen.style.display = 'none';
     resultScreen.style.display = 'none';
@@ -135,7 +155,7 @@ layout: default
     typeInput.classList.remove('input-wrong');
     renderWord();
     updateLiveStats();
-    liveTimer = setInterval(updateLiveStats, 500);
+    liveTimer = setInterval(updateLiveStats, 100); // 빠르게 실시간으로 갱신
     setTimeout(function () { typeInput.focus(); }, 50);
   }
 
@@ -164,21 +184,64 @@ layout: default
     if (!game) return;
     var elapsedMin = Math.max(game.elapsedMs() / 60000, 1 / 60);
     var cpm = Math.round(game.totalKeystrokes / elapsedMin);
-    statCpm.textContent = cpm;
+    if (cpm !== lastCpm) {
+      statCpm.textContent = cpm;
+      flashTick(statCpm);
+      lastCpm = cpm;
+    }
     var acc = game.totalCharsTyped > 0 ? Math.round((game.correctChars / game.totalCharsTyped) * 100) : 100;
     statAcc.textContent = acc + '%';
     statTime.textContent = Math.floor(game.elapsedMs() / 1000) + '초';
     progressFill.style.width = Math.round((game.index / game.words.length) * 100) + '%';
   }
 
-  typeInput.addEventListener('input', function () {
+  function flashTick(el) {
+    el.classList.remove('tick');
+    void el.offsetWidth; // 리플로우 강제 — 애니메이션 재시작
+    el.classList.add('tick');
+  }
+
+  // 한글은 IME로 조합되기 때문에, 아직 조합 중인 마지막 글자("깡"을 치는 중의 "까" 같은
+  // 중간 상태)를 완성된 글자로 착각하지 않도록 compositionstart/compositionend로 조합 여부를 추적한다.
+  var composing = false;
+  typeInput.addEventListener('compositionstart', function () { composing = true; });
+  typeInput.addEventListener('compositionend', function () {
+    composing = false;
+    checkSubmit();
+  });
+
+  typeInput.addEventListener('input', function (e) {
     renderWord();
+    if (composing || e.isComposing) return; // 조합이 끝날 때까지는 제출 판단을 보류
+    checkSubmit();
+  });
+
+  function checkSubmit() {
     var target = game.currentWord();
     if (typeInput.value.length >= target.length) {
       var typed = typeInput.value;
       var res = game.submitWord(typed);
       typeInput.classList.toggle('input-wrong', !res.correct);
       typeInput.value = '';
+
+      wordDisplay.classList.remove('pulse-correct', 'shake-wrong');
+      void wordDisplay.offsetWidth;
+
+      if (res.correct) {
+        combo++;
+        wordDisplay.classList.add('pulse-correct');
+        WootypeSound.playCorrect(combo);
+        if (combo > 0 && combo % 5 === 0) {
+          WootypeSound.playCombo();
+          showComboBadge(combo);
+        }
+      } else {
+        combo = 0;
+        wordDisplay.classList.add('shake-wrong');
+        WootypeSound.playWrong();
+      }
+      updateLiveStats();
+
       if (res.done) {
         finishGame();
       } else {
@@ -186,7 +249,21 @@ layout: default
         setTimeout(function () { typeInput.classList.remove('input-wrong'); }, 150);
       }
     }
-  });
+  }
+
+  var comboHideTimer = null;
+  function showComboBadge(n) {
+    var badge = document.getElementById('comboBadge');
+    badge.textContent = n + '연속 🔥';
+    badge.classList.remove('show', 'hide');
+    void badge.offsetWidth;
+    badge.classList.add('show');
+    clearTimeout(comboHideTimer);
+    comboHideTimer = setTimeout(function () {
+      badge.classList.remove('show');
+      badge.classList.add('hide');
+    }, 1400);
+  }
 
   function finishGame() {
     clearInterval(liveTimer);
@@ -194,9 +271,6 @@ layout: default
     resultScreen.style.display = 'block';
 
     var r = game.result();
-    document.getElementById('rCpm').textContent = r.cpm;
-    document.getElementById('rAcc').textContent = r.accuracy + '%';
-    document.getElementById('rTime').textContent = r.elapsedSec + '초';
 
     var emoji = '🎉', title = '완료!', sub = '';
     if (r.cpm >= 500) { emoji = '🔥'; title = '엄청나네요!'; sub = '타자왕급 속도입니다.'; }
@@ -207,8 +281,39 @@ layout: default
     document.getElementById('resultTitle').textContent = title;
     document.getElementById('resultSub').textContent = sub + ' (' + THEME_NAME + ' ' + r.wordCount + '개)';
 
+    countUp(document.getElementById('rCpm'), r.cpm, '');
+    countUp(document.getElementById('rAcc'), r.accuracy, '%');
+    countUp(document.getElementById('rTime'), r.elapsedSec, '초');
+
+    WootypeSound.playFinish();
+    if (window.confetti) {
+      var particleCount = r.cpm >= 300 ? 160 : 80;
+      confetti({ particleCount: particleCount, spread: 80, origin: { y: 0.4 }, colors: ['#4F46E5', '#6366F1', '#F59E0B', '#22C55E'] });
+      if (r.cpm >= 500) {
+        setTimeout(function () {
+          confetti({ particleCount: 100, spread: 120, origin: { y: 0.3 }, colors: ['#F59E0B', '#EF4444', '#4F46E5'] });
+        }, 350);
+      }
+    }
+
     window._wootypeLastResult = r;
     loadLeaderboard();
+  }
+
+  // 0에서 target까지 빠르게 세는 애니메이션 (약 700ms)
+  function countUp(el, target, suffix) {
+    var duration = 700;
+    var start = performance.now();
+    var isFloat = target % 1 !== 0;
+    function frame(now) {
+      var progress = Math.min((now - start) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3); // ease-out
+      var current = target * eased;
+      el.textContent = (isFloat ? current.toFixed(1) : Math.round(current)) + suffix;
+      if (progress < 1) requestAnimationFrame(frame);
+      else el.textContent = target + suffix;
+    }
+    requestAnimationFrame(frame);
   }
 
   document.getElementById('btnSubmitScore').addEventListener('click', function () {
