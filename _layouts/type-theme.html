@@ -1,0 +1,255 @@
+---
+layout: default
+---
+
+<div class="game-page">
+
+  <nav class="breadcrumb" aria-label="위치">
+    <a href="/">홈</a>
+    <span>›</span>
+    <span>{{ page.themeName }} 타자연습</span>
+  </nav>
+
+  <div class="game-header">
+    <h1>{{ page.emoji }} {{ page.themeName }} 타자연습</h1>
+    <p>{{ page.desc }}</p>
+  </div>
+
+  <!-- 시작 화면 -->
+  <div id="startScreen" class="start-screen">
+    <div class="theme-icon-big">{{ page.emoji }}</div>
+    <p style="color:var(--text-muted);margin-bottom:8px;">몇 개를 타이핑할까요?</p>
+    <div class="count-select" id="countSelect">
+      <button class="count-btn" data-count="20">20개</button>
+      <button class="count-btn active" data-count="50">50개</button>
+      <button class="count-btn" data-count="{{ page.words.size }}">전체 ({{ page.words.size }}개)</button>
+    </div>
+    <button class="btn-start" id="btnStart">🚀 시작하기</button>
+  </div>
+
+  <!-- 플레이 화면 -->
+  <div id="playScreen" style="display:none;">
+    <div class="stat-row">
+      <div class="stat-box"><div class="label">진행</div><div class="value" id="statProgress">0/0</div></div>
+      <div class="stat-box"><div class="label">타수</div><div class="value" id="statCpm">0</div></div>
+      <div class="stat-box"><div class="label">정확도</div><div class="value" id="statAcc">100%</div></div>
+      <div class="stat-box"><div class="label">시간</div><div class="value" id="statTime">0초</div></div>
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
+
+    <div class="word-display" id="wordDisplay"></div>
+    <input type="text" id="typeInput" class="type-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="여기에 입력하세요">
+    <p class="next-word-hint">글자를 다 입력하면 자동으로 다음 단어로 넘어갑니다</p>
+
+    <div class="ad-slot" style="margin-top:24px;">{% include ad.html %}</div>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div id="resultScreen" class="result-screen" style="display:none;">
+    <div class="result-emoji" id="resultEmoji">🎉</div>
+    <h2 id="resultTitle">완료!</h2>
+    <p class="result-sub" id="resultSub"></p>
+
+    <div class="result-stats">
+      <div class="result-stat-box"><div class="rlabel">타수(타/분)</div><div class="rvalue" id="rCpm">0</div></div>
+      <div class="result-stat-box"><div class="rlabel">정확도</div><div class="rvalue" id="rAcc">0%</div></div>
+      <div class="result-stat-box"><div class="rlabel">걸린 시간</div><div class="rvalue" id="rTime">0초</div></div>
+    </div>
+
+    <div class="ad-slot" style="margin-bottom:24px;">{% include ad.html %}</div>
+
+    <div id="submitBox">
+      <div class="nickname-form">
+        <input type="text" id="nicknameInput" class="nickname-input" maxlength="20" placeholder="닉네임 (선택)">
+        <button class="btn-ghost primary" id="btnSubmitScore">순위표 등록</button>
+      </div>
+      <p id="submitStatus" style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px;"></p>
+    </div>
+
+    <h3 style="font-size:1.05rem;margin-bottom:14px;">🏆 {{ page.themeName }} 순위표 TOP 10</h3>
+    <div class="leaderboard-panel" id="leaderboardPanel">
+      <div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>
+      <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">불러오는 중...</div>
+    </div>
+
+    <div class="result-actions" style="margin-top:24px;">
+      <button class="btn-ghost primary" id="btnRetry">🔄 다시하기</button>
+      <a href="/" class="btn-ghost">🗂️ 다른 테마 보기</a>
+    </div>
+  </div>
+
+</div>
+
+<script src="{{ '/assets/js/typing-engine.js' | relative_url }}"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="{{ '/assets/js/leaderboard.js' | relative_url }}"></script>
+
+<script>
+(function () {
+  var THEME_SLUG = {{ page.slug | jsonify }};
+  var THEME_NAME = {{ page.themeName | jsonify }};
+  var WORD_POOL = {{ page.words | jsonify }};
+
+  var startScreen = document.getElementById('startScreen');
+  var playScreen = document.getElementById('playScreen');
+  var resultScreen = document.getElementById('resultScreen');
+  var countSelect = document.getElementById('countSelect');
+  var btnStart = document.getElementById('btnStart');
+  var wordDisplay = document.getElementById('wordDisplay');
+  var typeInput = document.getElementById('typeInput');
+  var progressFill = document.getElementById('progressFill');
+  var statProgress = document.getElementById('statProgress');
+  var statCpm = document.getElementById('statCpm');
+  var statAcc = document.getElementById('statAcc');
+  var statTime = document.getElementById('statTime');
+
+  var selectedCount = 50;
+  var game = null;
+  var liveTimer = null;
+
+  countSelect.addEventListener('click', function (e) {
+    var btn = e.target.closest('.count-btn');
+    if (!btn) return;
+    document.querySelectorAll('.count-btn').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    selectedCount = parseInt(btn.dataset.count, 10);
+  });
+
+  btnStart.addEventListener('click', startGame);
+  document.getElementById('btnRetry').addEventListener('click', function () {
+    resultScreen.style.display = 'none';
+    startScreen.style.display = 'block';
+  });
+
+  function startGame() {
+    var words = WootypeEngine.pickWords(WORD_POOL, selectedCount);
+    game = new WootypeEngine.TypingGame(words);
+    game.start();
+
+    startScreen.style.display = 'none';
+    resultScreen.style.display = 'none';
+    playScreen.style.display = 'block';
+
+    typeInput.value = '';
+    typeInput.classList.remove('input-wrong');
+    renderWord();
+    updateLiveStats();
+    liveTimer = setInterval(updateLiveStats, 500);
+    setTimeout(function () { typeInput.focus(); }, 50);
+  }
+
+  function renderWord() {
+    var target = game.currentWord();
+    var typed = typeInput.value;
+    var html = '';
+    for (var i = 0; i < target.length; i++) {
+      var cls = 'char-pending';
+      if (i < typed.length) {
+        cls = typed[i] === target[i] ? 'char-correct' : 'char-wrong';
+      }
+      html += '<span class="' + cls + '">' + escapeHtml(target[i]) + '</span>';
+    }
+    wordDisplay.innerHTML = html;
+    statProgress.textContent = (game.index + 1) + '/' + game.words.length;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function updateLiveStats() {
+    if (!game) return;
+    var elapsedMin = Math.max(game.elapsedMs() / 60000, 1 / 60);
+    var cpm = Math.round(game.totalKeystrokes / elapsedMin);
+    statCpm.textContent = cpm;
+    var acc = game.totalCharsTyped > 0 ? Math.round((game.correctChars / game.totalCharsTyped) * 100) : 100;
+    statAcc.textContent = acc + '%';
+    statTime.textContent = Math.floor(game.elapsedMs() / 1000) + '초';
+    progressFill.style.width = Math.round((game.index / game.words.length) * 100) + '%';
+  }
+
+  typeInput.addEventListener('input', function () {
+    renderWord();
+    var target = game.currentWord();
+    if (typeInput.value.length >= target.length) {
+      var typed = typeInput.value;
+      var res = game.submitWord(typed);
+      typeInput.classList.toggle('input-wrong', !res.correct);
+      typeInput.value = '';
+      if (res.done) {
+        finishGame();
+      } else {
+        renderWord();
+        setTimeout(function () { typeInput.classList.remove('input-wrong'); }, 150);
+      }
+    }
+  });
+
+  function finishGame() {
+    clearInterval(liveTimer);
+    playScreen.style.display = 'none';
+    resultScreen.style.display = 'block';
+
+    var r = game.result();
+    document.getElementById('rCpm').textContent = r.cpm;
+    document.getElementById('rAcc').textContent = r.accuracy + '%';
+    document.getElementById('rTime').textContent = r.elapsedSec + '초';
+
+    var emoji = '🎉', title = '완료!', sub = '';
+    if (r.cpm >= 500) { emoji = '🔥'; title = '엄청나네요!'; sub = '타자왕급 속도입니다.'; }
+    else if (r.cpm >= 300) { emoji = '⭐'; title = '훌륭해요!'; sub = '평균보다 훨씬 빠른 속도예요.'; }
+    else if (r.cpm >= 150) { emoji = '👍'; title = '잘했어요!'; sub = '무난한 속도네요.'; }
+    else { emoji = '🌱'; title = '완료!'; sub = '연습할수록 빨라질 거예요.'; }
+    document.getElementById('resultEmoji').textContent = emoji;
+    document.getElementById('resultTitle').textContent = title;
+    document.getElementById('resultSub').textContent = sub + ' (' + THEME_NAME + ' ' + r.wordCount + '개)';
+
+    window._wootypeLastResult = r;
+    loadLeaderboard();
+  }
+
+  document.getElementById('btnSubmitScore').addEventListener('click', function () {
+    var r = window._wootypeLastResult;
+    if (!r) return;
+    var nickname = document.getElementById('nicknameInput').value;
+    var statusEl = document.getElementById('submitStatus');
+    if (!WootypeLeaderboard.isConfigured()) {
+      statusEl.textContent = '순위표는 준비 중입니다. 곧 오픈돼요!';
+      return;
+    }
+    statusEl.textContent = '등록 중...';
+    WootypeLeaderboard.submitScore(THEME_SLUG, nickname, r.cpm, r.accuracy).then(function (ok) {
+      statusEl.textContent = ok ? '✅ 순위표에 등록했어요!' : '등록에 실패했어요. 잠시 후 다시 시도해주세요.';
+      if (ok) loadLeaderboard();
+    });
+  });
+
+  function loadLeaderboard() {
+    var panel = document.getElementById('leaderboardPanel');
+    if (!WootypeLeaderboard.isConfigured()) {
+      panel.innerHTML = '<div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>' +
+        '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">순위표 준비 중입니다.</div>';
+      return;
+    }
+    WootypeLeaderboard.fetchTop(THEME_SLUG, 10).then(function (rows) {
+      if (rows.length === 0) {
+        panel.innerHTML = '<div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>' +
+          '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">아직 등록된 기록이 없어요. 첫 번째 주인공이 되어보세요!</div>';
+        return;
+      }
+      var html = '<div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>';
+      rows.forEach(function (row, i) {
+        var rankCls = i === 0 ? ' rank-1' : i === 1 ? ' rank-2' : i === 2 ? ' rank-3' : '';
+        html += '<div class="lb-row"><span class="lb-rank' + rankCls + '">' + (i + 1) + '</span>' +
+          '<span class="lb-name">' + escapeHtml(row.nickname) + '</span>' +
+          '<span class="lb-cpm">' + row.cpm + '</span>' +
+          '<span class="lb-acc">' + row.accuracy + '%</span></div>';
+      });
+      panel.innerHTML = html;
+    });
+  }
+})();
+</script>
