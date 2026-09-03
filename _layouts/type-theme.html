@@ -310,6 +310,9 @@ layout: default
       typedIdx++;
     }
     wordDisplay.innerHTML = html;
+    wordDisplay.classList.remove('text-md', 'text-sm');
+    if (target.length > 20) wordDisplay.classList.add('text-sm');
+    else if (target.length > 10) wordDisplay.classList.add('text-md');
     statProgress.textContent = (game.index + 1) + '/' + game.words.length;
 
     var prevWord = game.index > 0 ? game.words[game.index - 1] : '';

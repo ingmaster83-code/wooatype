@@ -145,12 +145,15 @@ img { max-width: 100%; height: auto; }
 
 .word-display {
   background: var(--white); border: 2px solid var(--border);
-  border-radius: var(--radius); padding: 40px 24px;
+  border-radius: var(--radius); padding: 28px 24px;
   text-align: center; margin-bottom: 20px;
-  font-size: 2.4rem; font-weight: 800; letter-spacing: .04em;
-  min-height: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 2.4rem; font-weight: 800; letter-spacing: .04em; line-height: 1.35;
+  min-height: 100px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
   position: relative; transition: border-color .15s, box-shadow .15s;
 }
+/* 속담처럼 문장형 항목(글자 수가 긴 단어)은 자동으로 글씨 크기를 줄여서 줄바꿈되게 함 — renderWord()에서 부여 */
+.word-display.text-md { font-size: 1.6rem; }
+.word-display.text-sm { font-size: 1.15rem; }
 .word-display .char-correct { color: var(--correct); }
 .word-display .char-wrong { color: var(--wrong); text-decoration: underline; }
 .word-display .char-pending { color: var(--text); opacity: .35; }
