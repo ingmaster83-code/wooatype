@@ -30,3 +30,92 @@ description: 과자, 라면, 아이스크림 등 익숙한 이름으로 즐기�
     같은 글자 수라도 받침이 있는 단어일수록 타수가 더 높게 나올 수 있어요.
   </div>
 </div>
+
+<div class="section" id="rankingSection">
+  <h2 class="section-title">🏆 실시간 랭킹</h2>
+  <div class="ranking-tabs">
+    <div class="rt-category-tabs" id="rtCategoryTabs">
+      {% for p in sorted %}
+      <button class="rt-cat-btn{% if forloop.first %} active{% endif %}" data-slug="{{ p.slug }}">{{ p.emoji }} {{ p.themeName }}</button>
+      {% endfor %}
+    </div>
+    <div class="rt-period-tabs" id="rtPeriodTabs">
+      <button class="rt-period-btn active" data-period="daily">일간</button>
+      <button class="rt-period-btn" data-period="weekly">주간</button>
+      <button class="rt-period-btn" data-period="monthly">월간</button>
+    </div>
+  </div>
+  <div class="leaderboard-panel" id="homeLeaderboardPanel">
+    <div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>
+    <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">불러오는 중...</div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="{{ '/assets/js/firebase-config.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/leaderboard.js' | relative_url }}"></script>
+<script>
+(function () {
+  var catTabs = document.getElementById('rtCategoryTabs');
+  var periodTabs = document.getElementById('rtPeriodTabs');
+  var panel = document.getElementById('homeLeaderboardPanel');
+  if (!catTabs) return;
+  var activeCatBtn = catTabs.querySelector('.rt-cat-btn.active');
+  var curSlug = activeCatBtn ? activeCatBtn.dataset.slug : null;
+  var curPeriod = 'daily';
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function render(rows) {
+    var header = '<div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>';
+    if (!window.WootypeLeaderboard || !WootypeLeaderboard.isConfigured()) {
+      panel.innerHTML = header + '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">순위표 준비 중입니다.</div>';
+      return;
+    }
+    if (!rows || rows.length === 0) {
+      panel.innerHTML = header + '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">아직 등록된 기록이 없어요. 첫 번째 주인공이 되어보세요!</div>';
+      return;
+    }
+    var html = header;
+    rows.forEach(function (row, i) {
+      var rankCls = i === 0 ? ' rank-1' : i === 1 ? ' rank-2' : i === 2 ? ' rank-3' : '';
+      html += '<div class="lb-row"><span class="lb-rank' + rankCls + '">' + (i + 1) + '</span>' +
+        '<span class="lb-name">' + escapeHtml(row.nickname) + '</span>' +
+        '<span class="lb-cpm">' + row.cpm + '</span>' +
+        '<span class="lb-acc">' + row.accuracy + '%</span></div>';
+    });
+    panel.innerHTML = html;
+  }
+
+  function load() {
+    panel.innerHTML = '<div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>' +
+      '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">불러오는 중...</div>';
+    if (!curSlug || !window.WootypeLeaderboard || !WootypeLeaderboard.isConfigured()) { render([]); return; }
+    WootypeLeaderboard.fetchTopByPeriod(curSlug, curPeriod, 10).then(render);
+  }
+
+  catTabs.addEventListener('click', function (e) {
+    var btn = e.target.closest('.rt-cat-btn');
+    if (!btn) return;
+    catTabs.querySelectorAll('.rt-cat-btn').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    curSlug = btn.dataset.slug;
+    load();
+  });
+  periodTabs.addEventListener('click', function (e) {
+    var btn = e.target.closest('.rt-period-btn');
+    if (!btn) return;
+    periodTabs.querySelectorAll('.rt-period-btn').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    curPeriod = btn.dataset.period;
+    load();
+  });
+
+  load();
+})();
+</script>

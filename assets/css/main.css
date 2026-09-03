@@ -290,6 +290,52 @@ img { max-width: 100%; height: auto; }
 
 .notice-box { background: var(--primary-light); border-radius: var(--radius); padding: 18px 20px; font-size: .88rem; color: var(--primary-dark); line-height: 1.7; margin: 24px 0; }
 
+/* ===== 랭킹 탭(홈/테마 시작화면 공용) ===== */
+.ranking-tabs { margin-bottom: 16px; }
+.rt-category-tabs {
+  display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+  max-width: 720px; margin: 0 auto 12px;
+}
+.rt-cat-btn {
+  padding: 6px 14px; border: 1.5px solid var(--border); border-radius: 999px;
+  background: var(--white); cursor: pointer; font-weight: 600; font-size: .82rem;
+  transition: all .15s;
+}
+.rt-cat-btn.active, .rt-cat-btn:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
+
+.rt-period-tabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
+.rt-period-btn {
+  padding: 7px 20px; border: 1.5px solid var(--border); border-radius: 999px;
+  background: var(--white); cursor: pointer; font-weight: 700; font-size: .84rem;
+  color: var(--text-muted); transition: all .15s;
+}
+.rt-period-btn.active, .rt-period-btn:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
+
+.ranking-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; text-align: center; }
+
+/* ===== 실시간 순위 배지(플레이 화면) ===== */
+.live-rank-wrap { text-align: center; min-height: 30px; margin-bottom: 10px; }
+.live-rank {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--primary-light); color: var(--primary-dark);
+  font-size: .82rem; font-weight: 700; padding: 6px 16px; border-radius: 999px;
+  opacity: 0; transform: translateY(-4px); transition: opacity .25s, transform .25s;
+}
+.live-rank.show { opacity: 1; transform: translateY(0); }
+
+/* ===== TOP10 진입 배지(결과 화면) ===== */
+.top10-badge {
+  display: none; background: linear-gradient(135deg, #F59E0B, #EF4444);
+  color: white; font-weight: 800; font-size: .92rem; line-height: 1.5;
+  padding: 14px 20px; border-radius: var(--radius);
+  margin-bottom: 18px; box-shadow: 0 6px 18px rgba(245,158,11,.35);
+}
+.top10-badge.show { display: block; animation: top10Pop .5s cubic-bezier(.34,1.56,.64,1); }
+@keyframes top10Pop {
+  0% { transform: scale(.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 @media (max-width: 640px) {
   .word-display { font-size: 1.7rem; padding: 30px 16px; }
   .stat-row { grid-template-columns: repeat(2, 1fr); }

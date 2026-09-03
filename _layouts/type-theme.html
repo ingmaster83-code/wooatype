@@ -34,12 +34,26 @@ layout: default
     </div>
     <button class="btn-start" id="btnStart">🚀 시작하기</button>
 
+    <div class="ranking-tabs" style="margin-top:36px;">
+      <div class="rt-period-tabs" id="startPeriodTabs">
+        <button class="rt-period-btn active" data-period="daily">일간</button>
+        <button class="rt-period-btn" data-period="weekly">주간</button>
+        <button class="rt-period-btn" data-period="monthly">월간</button>
+      </div>
+    </div>
+    <div class="ranking-title">🏆 {{ page.themeName }} 순위 TOP 10</div>
+    <div class="leaderboard-panel" id="startLeaderboardPanel">
+      <div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>
+      <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">불러오는 중...</div>
+    </div>
+
     <div class="ad-slot" style="margin-top:32px;">{% include ad.html %}</div>
   </div>
 
   <!-- 플레이 화면 -->
   <div id="playScreen" style="display:none;position:relative;">
     <button class="sound-toggle" id="soundToggle" title="소리 켜기/끄기">🔊</button>
+    <div class="live-rank-wrap"><span class="live-rank" id="liveRank">🏅 <span id="liveRankText"></span></span></div>
     <div class="stat-row">
       <div class="stat-box"><div class="label">진행</div><div class="value" id="statProgress">0/0</div></div>
       <div class="stat-box"><div class="label">타수</div><div class="value" id="statCpm">0</div></div>
@@ -84,6 +98,8 @@ layout: default
     </div>
 
     <div class="ad-slot" style="margin-bottom:24px;">{% include ad.html %}</div>
+
+    <div class="top10-badge" id="top10Badge"></div>
 
     <div id="submitBox">
       <div class="nickname-form">
@@ -143,6 +159,8 @@ layout: default
   var combo = 0;
   var lastCpm = 0;
   var lastWordCorrect = null; // 이전 단어 정답 여부(맨 처음엔 null)
+  var cachedDailyBoard = null;    // 시작 화면에서 가져온 "일간" TOP10 — 플레이 중 실시간 순위 표시에 재사용(추가 조회 없음)
+  var lastShownLiveRank = null;   // 순위 배지 불필요한 재렌더 방지
 
   function currentPool() {
     return currentLang === 'en' && WORD_POOL_EN ? WORD_POOL_EN : WORD_POOL_KO;
@@ -177,7 +195,67 @@ layout: default
   document.getElementById('btnRetry').addEventListener('click', function () {
     resultScreen.style.display = 'none';
     startScreen.style.display = 'block';
+    document.getElementById('top10Badge').classList.remove('show');
   });
+
+  // ── 시작 화면 순위(일간/주간/월간) ──────────────────────────────────
+  var startPeriodTabs = document.getElementById('startPeriodTabs');
+  var startLbPanel = document.getElementById('startLeaderboardPanel');
+
+  function renderLbPanel(panel, rows) {
+    var header = '<div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>';
+    if (!window.WootypeLeaderboard || !WootypeLeaderboard.isConfigured()) {
+      panel.innerHTML = header + '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">순위표 준비 중입니다.</div>';
+      return;
+    }
+    if (!rows || rows.length === 0) {
+      panel.innerHTML = header + '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">아직 등록된 기록이 없어요. 첫 번째 주인공이 되어보세요!</div>';
+      return;
+    }
+    var html = header;
+    rows.forEach(function (row, i) {
+      var rankCls = i === 0 ? ' rank-1' : i === 1 ? ' rank-2' : i === 2 ? ' rank-3' : '';
+      html += '<div class="lb-row"><span class="lb-rank' + rankCls + '">' + (i + 1) + '</span>' +
+        '<span class="lb-name">' + escapeHtml(row.nickname) + '</span>' +
+        '<span class="lb-cpm">' + row.cpm + '</span>' +
+        '<span class="lb-acc">' + row.accuracy + '%</span></div>';
+    });
+    panel.innerHTML = html;
+  }
+
+  function loadStartRanking(period) {
+    startLbPanel.innerHTML = '<div class="lb-row lb-header"><span>#</span><span>닉네임</span><span>타수</span><span>정확도</span></div>' +
+      '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.85rem;">불러오는 중...</div>';
+    if (!window.WootypeLeaderboard || !WootypeLeaderboard.isConfigured()) {
+      renderLbPanel(startLbPanel, []);
+      return;
+    }
+    WootypeLeaderboard.fetchTopByPeriod(THEME_SLUG, period, 10).then(function (rows) {
+      renderLbPanel(startLbPanel, rows);
+      // 일간 순위는 플레이 화면에서 실시간 순위 표시에 재사용(추가 DB 조회 없이)
+      if (period === 'daily') cachedDailyBoard = rows;
+    });
+  }
+  if (startPeriodTabs) {
+    startPeriodTabs.addEventListener('click', function (e) {
+      var btn = e.target.closest('.rt-period-btn');
+      if (!btn) return;
+      startPeriodTabs.querySelectorAll('.rt-period-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      loadStartRanking(btn.dataset.period);
+    });
+  }
+  loadStartRanking('daily');
+
+  // 캐시된 일간 순위(top10) 안에서의 예상 순위. top10 안일 때만 정확하게 계산 가능하므로
+  // 그 밖은 null(플레이 중엔 배지를 숨기고, 결과 화면 축하 이펙트도 트리거하지 않음).
+  function computeLiveRank(cpm) {
+    if (!cachedDailyBoard) return null;
+    var better = cachedDailyBoard.filter(function (row) { return row.cpm > cpm; }).length;
+    var rank = better + 1;
+    if (cachedDailyBoard.length < 10 || rank <= 10) return rank;
+    return null;
+  }
 
   // 사운드 토글
   var soundToggle = document.getElementById('soundToggle');
@@ -198,6 +276,8 @@ layout: default
     combo = 0;
     lastCpm = 0;
     lastWordCorrect = null;
+    lastShownLiveRank = null;
+    document.getElementById('liveRank').classList.remove('show');
 
     startScreen.style.display = 'none';
     resultScreen.style.display = 'none';
@@ -268,6 +348,18 @@ layout: default
     statAcc.textContent = acc + '%';
     statTime.textContent = Math.floor(game.elapsedMs() / 1000) + '초';
     progressFill.style.width = Math.round((game.index / game.words.length) * 100) + '%';
+
+    var rank = computeLiveRank(cpm);
+    if (rank !== lastShownLiveRank) {
+      var liveRank = document.getElementById('liveRank');
+      if (rank) {
+        document.getElementById('liveRankText').textContent = '오늘 ' + rank + '위 도전 중!';
+        liveRank.classList.add('show');
+      } else {
+        liveRank.classList.remove('show');
+      }
+      lastShownLiveRank = rank;
+    }
   }
 
   function flashTick(el) {
@@ -380,8 +472,31 @@ layout: default
       }
     }
 
+    // 캐시해둔 "일간" TOP10(시작 화면에서 이미 가져온 데이터, 추가 조회 없음) 기준으로
+    // 이번 기록이 오늘 10위 안에 들 수 있는지 예측 — 들면 별도 축하 이펙트 + 등록 유도 배지
+    var predictedRank = computeLiveRank(r.cpm);
+    var top10Badge = document.getElementById('top10Badge');
+    if (predictedRank && predictedRank <= 10) {
+      top10Badge.textContent = '🏆 오늘의 TOP 10 진입! 예상 순위 ' + predictedRank + '위 — 지금 등록해서 이름을 남겨보세요!';
+      top10Badge.classList.add('show');
+      launchTop10Fireworks();
+    } else {
+      top10Badge.classList.remove('show');
+    }
+
     window._wooatypeLastResult = r;
     loadLeaderboard();
+  }
+
+  // 좌우 대칭으로 쏘아 올리는 불꽃놀이 — 일반 완료 컨페티보다 훨씬 화려하게, TOP10 진입 시에만 사용
+  function launchTop10Fireworks() {
+    if (!window.confetti) return;
+    var end = Date.now() + 1500;
+    (function frame() {
+      confetti({ particleCount: 5, angle: 60, spread: 65, startVelocity: 55, origin: { x: 0, y: 0.7 }, colors: ['#F59E0B', '#EF4444', '#4F46E5', '#22C55E'] });
+      confetti({ particleCount: 5, angle: 120, spread: 65, startVelocity: 55, origin: { x: 1, y: 0.7 }, colors: ['#F59E0B', '#EF4444', '#4F46E5', '#22C55E'] });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
   }
 
   // 0에서 target까지 빠르게 세는 애니메이션 (약 700ms)
