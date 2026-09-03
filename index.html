@@ -14,7 +14,8 @@ description: 과자, 라면, 아이스크림 등 익숙한 이름으로 즐기�
   <div class="theme-grid">
     {% assign sorted = site.pages | where_exp: "p", "p.layout == 'type-theme'" %}
     {% for p in sorted %}
-    <a href="{{ p.url | relative_url }}" class="theme-card">
+    <a href="{{ p.url | relative_url }}" class="theme-card" style="position:relative;">
+      {% if p.wordsEn %}<span style="position:absolute;top:10px;right:10px;font-size:.68rem;font-weight:700;background:var(--primary-light);color:var(--primary-dark);padding:2px 8px;border-radius:999px;">🇺🇸 EN 지원</span>{% endif %}
       <span class="theme-icon">{{ p.emoji }}</span>
       <span class="theme-name">{{ p.themeName }}</span>
       <span class="theme-desc">{{ p.words.size }}개 단어</span>

@@ -113,6 +113,15 @@ img { max-width: 100%; height: auto; }
 .progress-bar-wrap { background: var(--border); border-radius: 20px; height: 8px; margin-bottom: 28px; overflow: hidden; }
 .progress-bar-fill { background: var(--primary); height: 100%; width: 0%; transition: width .2s; }
 
+.word-preview {
+  text-align: center; font-size: 1.15rem; font-weight: 600;
+  color: var(--text-muted); opacity: .55;
+  padding: 8px; min-height: 1.6em; letter-spacing: .02em;
+  transition: opacity .15s; margin-bottom: 4px;
+}
+.word-preview.word-prev { text-decoration: line-through; opacity: .35; }
+.word-preview.word-next::before { content: '다음 → '; font-size: .78rem; font-weight: 500; opacity: .8; }
+
 .word-display {
   background: var(--white); border: 2px solid var(--border);
   border-radius: var(--radius); padding: 40px 24px;
@@ -203,6 +212,7 @@ img { max-width: 100%; height: auto; }
 .start-screen { text-align: center; padding: 40px 20px; }
 .start-screen .theme-icon-big { font-size: 4rem; margin-bottom: 16px; }
 .count-select { display: flex; gap: 10px; justify-content: center; margin: 20px 0 28px; flex-wrap: wrap; }
+.lang-select { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .count-btn {
   padding: 10px 20px; border: 2px solid var(--border); border-radius: 999px;
   background: var(--white); cursor: pointer; font-weight: 600; font-size: .92rem;

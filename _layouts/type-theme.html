@@ -18,11 +18,19 @@ layout: default
   <!-- 시작 화면 -->
   <div id="startScreen" class="start-screen">
     <div class="theme-icon-big">{{ page.emoji }}</div>
+
+    {% if page.wordsEn %}
+    <div class="lang-select" id="langSelect" style="margin-bottom:20px;">
+      <button class="count-btn lang-btn active" data-lang="ko">🇰🇷 한글</button>
+      <button class="count-btn lang-btn" data-lang="en">🇺🇸 English</button>
+    </div>
+    {% endif %}
+
     <p style="color:var(--text-muted);margin-bottom:8px;">몇 개를 타이핑할까요?</p>
     <div class="count-select" id="countSelect">
       <button class="count-btn" data-count="20">20개</button>
       <button class="count-btn active" data-count="50">50개</button>
-      <button class="count-btn" data-count="{{ page.words.size }}">전체 ({{ page.words.size }}개)</button>
+      <button class="count-btn" data-count="all">전체 (<span id="allCountLabel">{{ page.words.size }}</span>개)</button>
     </div>
     <button class="btn-start" id="btnStart">🚀 시작하기</button>
   </div>
@@ -38,10 +46,12 @@ layout: default
     </div>
     <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
 
+    <div class="word-preview word-prev" id="wordPrev">&nbsp;</div>
     <div style="position:relative;">
       <div class="word-display" id="wordDisplay"></div>
       <span class="combo-badge" id="comboBadge"></span>
     </div>
+    <div class="word-preview word-next" id="wordNext">&nbsp;</div>
     <input type="text" id="typeInput" class="type-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="여기에 입력하세요">
     <p class="next-word-hint">글자를 다 입력하면 자동으로 다음 단어로 넘어갑니다</p>
 
@@ -95,12 +105,14 @@ layout: default
 (function () {
   var THEME_SLUG = {{ page.slug | jsonify }};
   var THEME_NAME = {{ page.themeName | jsonify }};
-  var WORD_POOL = {{ page.words | jsonify }};
+  var WORD_POOL_KO = {{ page.words | jsonify }};
+  var WORD_POOL_EN = {{ page.wordsEn | default: "null" | jsonify }};
 
   var startScreen = document.getElementById('startScreen');
   var playScreen = document.getElementById('playScreen');
   var resultScreen = document.getElementById('resultScreen');
   var countSelect = document.getElementById('countSelect');
+  var langSelect = document.getElementById('langSelect');
   var btnStart = document.getElementById('btnStart');
   var wordDisplay = document.getElementById('wordDisplay');
   var typeInput = document.getElementById('typeInput');
@@ -110,18 +122,40 @@ layout: default
   var statAcc = document.getElementById('statAcc');
   var statTime = document.getElementById('statTime');
 
-  var selectedCount = 50;
+  var selectedCount = 50; // 'all'이면 문자열, 아니면 숫자
+  var currentLang = 'ko';
   var game = null;
   var liveTimer = null;
   var combo = 0;
   var lastCpm = 0;
 
+  function currentPool() {
+    return currentLang === 'en' && WORD_POOL_EN ? WORD_POOL_EN : WORD_POOL_KO;
+  }
+
+  function updateAllCountLabel() {
+    var label = document.getElementById('allCountLabel');
+    if (label) label.textContent = currentPool().length;
+  }
+  updateAllCountLabel();
+
+  if (langSelect) {
+    langSelect.addEventListener('click', function (e) {
+      var btn = e.target.closest('.lang-btn');
+      if (!btn) return;
+      langSelect.querySelectorAll('.lang-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentLang = btn.dataset.lang;
+      updateAllCountLabel();
+    });
+  }
+
   countSelect.addEventListener('click', function (e) {
     var btn = e.target.closest('.count-btn');
     if (!btn) return;
-    document.querySelectorAll('.count-btn').forEach(function (b) { b.classList.remove('active'); });
+    countSelect.querySelectorAll('.count-btn').forEach(function (b) { b.classList.remove('active'); });
     btn.classList.add('active');
-    selectedCount = parseInt(btn.dataset.count, 10);
+    selectedCount = btn.dataset.count === 'all' ? 'all' : parseInt(btn.dataset.count, 10);
   });
 
   btnStart.addEventListener('click', startGame);
@@ -141,7 +175,9 @@ layout: default
 
   function startGame() {
     WootypeSound.playKeystroke(); // 사용자 클릭(제스처) 안에서 AudioContext를 확실히 깨워둠
-    var words = WootypeEngine.pickWords(WORD_POOL, selectedCount);
+    var pool = currentPool();
+    var count = selectedCount === 'all' ? pool.length : selectedCount;
+    var words = WootypeEngine.pickWords(pool, count);
     game = new WootypeEngine.TypingGame(words);
     game.start();
     combo = 0;
@@ -172,6 +208,11 @@ layout: default
     }
     wordDisplay.innerHTML = html;
     statProgress.textContent = (game.index + 1) + '/' + game.words.length;
+
+    var prevWord = game.index > 0 ? game.words[game.index - 1] : '';
+    var nextWord = game.index < game.words.length - 1 ? game.words[game.index + 1] : '';
+    document.getElementById('wordPrev').textContent = prevWord || ' ';
+    document.getElementById('wordNext').textContent = nextWord || ' ';
   }
 
   function escapeHtml(s) {
