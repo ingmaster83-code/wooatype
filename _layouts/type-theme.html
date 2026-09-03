@@ -46,12 +46,23 @@ layout: default
     </div>
     <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
 
-    <div class="word-preview word-prev" id="wordPrev">&nbsp;</div>
+    <div class="word-queue-row word-queue-prev">
+      <span class="word-chip word-chip-prev" id="wordPrevChip">
+        <span class="chip-icon" id="wordPrevIcon"></span>
+        <span class="chip-tag">이전</span>
+        <span id="wordPrevText">&nbsp;</span>
+      </span>
+    </div>
     <div style="position:relative;">
       <div class="word-display" id="wordDisplay"></div>
       <span class="combo-badge" id="comboBadge"></span>
     </div>
-    <div class="word-preview word-next" id="wordNext">&nbsp;</div>
+    <div class="word-queue-row word-queue-next">
+      <span class="word-chip word-chip-next">
+        <span class="chip-tag">다음</span>
+        <span id="wordNextText">&nbsp;</span>
+      </span>
+    </div>
     <input type="text" id="typeInput" class="type-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="여기에 입력하세요">
     <p class="next-word-hint">글자를 다 입력하면 자동으로 다음 단어로 넘어갑니다</p>
 
@@ -128,6 +139,7 @@ layout: default
   var liveTimer = null;
   var combo = 0;
   var lastCpm = 0;
+  var lastWordCorrect = null; // 이전 단어 정답 여부(맨 처음엔 null)
 
   function currentPool() {
     return currentLang === 'en' && WORD_POOL_EN ? WORD_POOL_EN : WORD_POOL_KO;
@@ -182,6 +194,7 @@ layout: default
     game.start();
     combo = 0;
     lastCpm = 0;
+    lastWordCorrect = null;
 
     startScreen.style.display = 'none';
     resultScreen.style.display = 'none';
@@ -196,23 +209,41 @@ layout: default
   }
 
   function renderWord() {
-    var target = game.currentWord();
-    var typed = typeInput.value;
+    var target = game.currentWord(); // 화면 표시용(공백 포함)
+    var typed = typeInput.value;     // 실제 입력값(공백은 input에서 이미 제거됨)
     var html = '';
+    var typedIdx = 0; // target의 공백이 아닌 글자에만 typed를 대응시킴
     for (var i = 0; i < target.length; i++) {
-      var cls = 'char-pending';
-      if (i < typed.length) {
-        cls = typed[i] === target[i] ? 'char-correct' : 'char-wrong';
+      var ch = target[i];
+      if (ch === ' ') {
+        html += '<span class="char-space">&nbsp;</span>';
+        continue;
       }
-      html += '<span class="' + cls + '">' + escapeHtml(target[i]) + '</span>';
+      var cls = 'char-pending';
+      if (typedIdx < typed.length) {
+        cls = typed[typedIdx] === ch ? 'char-correct' : 'char-wrong';
+      }
+      html += '<span class="' + cls + '">' + escapeHtml(ch) + '</span>';
+      typedIdx++;
     }
     wordDisplay.innerHTML = html;
     statProgress.textContent = (game.index + 1) + '/' + game.words.length;
 
     var prevWord = game.index > 0 ? game.words[game.index - 1] : '';
     var nextWord = game.index < game.words.length - 1 ? game.words[game.index + 1] : '';
-    document.getElementById('wordPrev').textContent = prevWord || ' ';
-    document.getElementById('wordNext').textContent = nextWord || ' ';
+    var prevRow = document.querySelector('.word-queue-prev');
+    var nextRow = document.querySelector('.word-queue-next');
+    document.getElementById('wordPrevText').textContent = prevWord || '';
+    document.getElementById('wordNextText').textContent = nextWord || '';
+    prevRow.style.visibility = prevWord ? 'visible' : 'hidden';
+    nextRow.style.visibility = nextWord ? 'visible' : 'hidden';
+
+    var prevChip = document.getElementById('wordPrevChip');
+    var prevIcon = document.getElementById('wordPrevIcon');
+    prevChip.classList.remove('is-correct', 'is-wrong');
+    if (lastWordCorrect === true) { prevChip.classList.add('is-correct'); prevIcon.textContent = '✅'; }
+    else if (lastWordCorrect === false) { prevChip.classList.add('is-wrong'); prevIcon.textContent = '❌'; }
+    else { prevIcon.textContent = ''; }
   }
 
   function escapeHtml(s) {
@@ -252,18 +283,27 @@ layout: default
   });
 
   typeInput.addEventListener('input', function (e) {
+    // "Janchi Guksu"처럼 여러 단어인 영문 항목은 스페이스바를 안 눌러도 되게
+    // 입력값에서 공백을 아예 제거한다(조합 중에는 건드리지 않음 — 조합 도중 값 변형은 IME를 깨뜨릴 수 있음).
+    if (!composing && !e.isComposing && typeInput.value.indexOf(' ') !== -1) {
+      var caret = typeInput.selectionStart;
+      var before = typeInput.value.slice(0, caret).replace(/ /g, '').length;
+      typeInput.value = typeInput.value.replace(/ /g, '');
+      typeInput.setSelectionRange(before, before);
+    }
     renderWord();
     if (composing || e.isComposing) return; // 조합이 끝날 때까지는 제출 판단을 보류
     checkSubmit();
   });
 
   function checkSubmit() {
-    var target = game.currentWord();
-    if (typeInput.value.length >= target.length) {
+    var targetLen = game.currentTypeTarget().length; // 공백 제외 길이
+    if (typeInput.value.length >= targetLen) {
       var typed = typeInput.value;
       var res = game.submitWord(typed);
       typeInput.classList.toggle('input-wrong', !res.correct);
       typeInput.value = '';
+      lastWordCorrect = res.correct;
 
       wordDisplay.classList.remove('pulse-correct', 'shake-wrong');
       void wordDisplay.offsetWidth;

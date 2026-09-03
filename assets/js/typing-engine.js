@@ -29,6 +29,12 @@
     return total;
   }
 
+  // "Janchi Guksu" 같은 여러 단어로 된 영문 항목은 스페이스바를 누르지 않아도
+  // 입력이 끝난 것으로 인정한다 — 공백을 비교/타수 계산 대상에서 아예 제외.
+  function stripSpaces(s) {
+    return (s || '').replace(/\s+/g, '');
+  }
+
   // Fisher-Yates 셔플
   function shuffle(arr) {
     var a = arr.slice();
@@ -69,6 +75,11 @@
     return this.words[this.index];
   };
 
+  // 실제로 입력해야 하는(공백 제외) 목표 문자열 — 완료 판정·타수 계산 기준.
+  TypingGame.prototype.currentTypeTarget = function () {
+    return stripSpaces(this.currentWord());
+  };
+
   TypingGame.prototype.isLast = function () {
     return this.index >= this.words.length - 1;
   };
@@ -76,8 +87,9 @@
   // 한 단어를 완료 처리(정확히 입력했다고 가정하고 다음으로 넘어갈 때 호출).
   // typedValue: 사용자가 최종적으로 입력창에 입력한 문자열(공백 트림 완료 상태)
   TypingGame.prototype.submitWord = function (typedValue) {
-    var target = this.currentWord();
-    var correct = typedValue === target;
+    var target = this.currentTypeTarget(); // 공백 제외한 목표 문자열
+    var typed = stripSpaces(typedValue);
+    var correct = typed === target;
 
     this.totalCharsTyped += target.length;
     if (correct) {
@@ -85,7 +97,7 @@
       this.totalKeystrokes += countKeystrokes(target);
     } else {
       // 오답이어도 시도한 타수만큼은 반영(정확도 계산 근거)
-      this.wrongKeystrokes += countKeystrokes(typedValue || '');
+      this.wrongKeystrokes += countKeystrokes(typed);
     }
 
     var done = this.isLast();
@@ -119,6 +131,7 @@
 
   global.WootypeEngine = {
     countKeystrokes: countKeystrokes,
+    stripSpaces: stripSpaces,
     shuffle: shuffle,
     pickWords: pickWords,
     TypingGame: TypingGame,

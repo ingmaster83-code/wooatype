@@ -113,14 +113,35 @@ img { max-width: 100%; height: auto; }
 .progress-bar-wrap { background: var(--border); border-radius: 20px; height: 8px; margin-bottom: 28px; overflow: hidden; }
 .progress-bar-fill { background: var(--primary); height: 100%; width: 0%; transition: width .2s; }
 
-.word-preview {
-  text-align: center; font-size: 1.15rem; font-weight: 600;
-  color: var(--text-muted); opacity: .55;
-  padding: 8px; min-height: 1.6em; letter-spacing: .02em;
-  transition: opacity .15s; margin-bottom: 4px;
+.word-queue-row {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 34px;
 }
-.word-preview.word-prev { text-decoration: line-through; opacity: .35; }
-.word-preview.word-next::before { content: '다음 → '; font-size: .78rem; font-weight: 500; opacity: .8; }
+.word-queue-row.word-queue-prev { margin-bottom: 10px; }
+.word-queue-row.word-queue-next { margin-top: 10px; }
+
+.word-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 16px; border-radius: 999px;
+  font-size: .92rem; font-weight: 600; letter-spacing: .01em;
+  max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: opacity .2s, transform .2s;
+}
+.word-chip .chip-tag { font-size: .68rem; font-weight: 800; letter-spacing: .04em; opacity: .75; flex-shrink: 0; }
+.word-chip .chip-icon { flex-shrink: 0; font-size: .8rem; }
+
+.word-chip-prev {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text-muted);
+  opacity: .65; text-decoration: line-through; text-decoration-color: var(--text-muted);
+}
+.word-chip-prev.is-wrong { color: var(--wrong); border-color: rgba(220,38,38,.25); background: rgba(220,38,38,.06); }
+.word-chip-prev.is-correct { color: var(--correct); border-color: rgba(22,163,74,.2); background: rgba(22,163,74,.06); }
+
+.word-chip-next {
+  background: var(--primary-light); color: var(--primary-dark);
+  border: 1px solid transparent; opacity: .9;
+}
+.word-chip-next .chip-tag { color: var(--primary); }
 
 .word-display {
   background: var(--white); border: 2px solid var(--border);
@@ -133,6 +154,11 @@ img { max-width: 100%; height: auto; }
 .word-display .char-correct { color: var(--correct); }
 .word-display .char-wrong { color: var(--wrong); text-decoration: underline; }
 .word-display .char-pending { color: var(--text); opacity: .35; }
+.word-display .char-space { display: inline-block; width: .5em; position: relative; }
+.word-display .char-space::after {
+  content: ''; position: absolute; left: 50%; bottom: .18em; transform: translateX(-50%);
+  width: 5px; height: 5px; border-radius: 50%; background: var(--border);
+}
 
 .word-display.pulse-correct { animation: pulseCorrect .32s ease; border-color: var(--correct); box-shadow: 0 0 0 6px rgba(22,163,74,.15); }
 .word-display.shake-wrong { animation: shakeWrong .32s ease; border-color: var(--wrong); box-shadow: 0 0 0 6px rgba(220,38,38,.15); }
