@@ -23,7 +23,7 @@
       db = firebase.firestore();
       ready = true;
     } catch (e) {
-      console.warn('[wootype] Firebase 초기화 실패:', e);
+      console.warn('[wooatype] Firebase 초기화 실패:', e);
       ready = false;
     }
     return ready;
@@ -49,7 +49,7 @@
       accuracy: Math.round(accuracy * 10) / 10,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     }).then(function () { return true; })
-      .catch(function (e) { console.warn('[wootype] 점수 등록 실패:', e); return false; });
+      .catch(function (e) { console.warn('[wooatype] 점수 등록 실패:', e); return false; });
   }
 
   /**
@@ -73,7 +73,7 @@
         return rows;
       })
       .catch(function (e) {
-        console.warn('[wootype] 순위표 조회 실패:', e);
+        console.warn('[wooatype] 순위표 조회 실패:', e);
         return [];
       });
   }

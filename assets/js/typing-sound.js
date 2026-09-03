@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  var STORAGE_KEY = 'wootype_muted';
+  var STORAGE_KEY = 'wooatype_muted';
   var ctx = null;
 
   function getCtx() {

@@ -377,7 +377,7 @@ layout: default
       }
     }
 
-    window._wootypeLastResult = r;
+    window._wooatypeLastResult = r;
     loadLeaderboard();
   }
 
@@ -398,7 +398,7 @@ layout: default
   }
 
   document.getElementById('btnSubmitScore').addEventListener('click', function () {
-    var r = window._wootypeLastResult;
+    var r = window._wooatypeLastResult;
     if (!r) return;
     var nickname = document.getElementById('nicknameInput').value;
     var statusEl = document.getElementById('submitStatus');
