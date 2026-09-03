@@ -1,7 +1,7 @@
 /*
  * leaderboard.js — Firebase Firestore 기반 테마별 순위표.
  *
- * window.WOOTYPE_FIREBASE_CONFIG 가 설정되지 않은 동안에는(초기 배포 단계)
+ * window.WOOATYPE_FIREBASE_CONFIG 가 설정되지 않은 동안에는(초기 배포 단계)
  * 모든 함수가 안전하게 "미설정" 상태로 동작한다 — 에러를 던지지 않고
  * 순위표 UI 쪽에서 "순위표 준비 중" 문구를 보여줄 수 있게 null/빈 배열을 반환.
  */
@@ -13,13 +13,13 @@
   var ready = false;
 
   function isConfigured() {
-    return !!(global.WOOTYPE_FIREBASE_CONFIG && global.WOOTYPE_FIREBASE_CONFIG.apiKey);
+    return !!(global.WOOATYPE_FIREBASE_CONFIG && global.WOOATYPE_FIREBASE_CONFIG.apiKey);
   }
 
   function init() {
     if (ready || !isConfigured()) return ready;
     try {
-      app = firebase.initializeApp(global.WOOTYPE_FIREBASE_CONFIG);
+      app = firebase.initializeApp(global.WOOATYPE_FIREBASE_CONFIG);
       db = firebase.firestore();
       ready = true;
     } catch (e) {
